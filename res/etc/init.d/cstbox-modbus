@@ -1,0 +1,24 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          cstbox-modbus
+# Required-Start:    $remote_fs $syslog cstbox-dbus cstbox-evtmgr
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: CSTBox Modbus devices support service
+# Description:       This package adds to an existing CSTBox framework the support
+#                    for Modbus interfaced devices. 
+#                    It includes the models of currently support products.
+### END INIT INFO
+
+# Author: Eric Pascual <eric.pascual@cstb.fr>
+
+DESC="CSTBox Modbus HAL"
+INIT_SEQ=94
+NAME=cstbox-modbus
+DAEMON=/opt/cstbox/bin/modbusd.py
+DAEMON_ARGS=
+INIT_VERBOSE=yes
+
+. /opt/cstbox/lib/init/init-functions
+
