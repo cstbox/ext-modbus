@@ -1,4 +1,4 @@
-Package: cstbox-modbus
+Package: cstbox-ext-modbus
 Version: 1.0.0
 Section: base
 Priority: optional
@@ -6,6 +6,5 @@ Architecture: all
 Depends: cstbox-core 
 Maintainer: Eric Pascual <eric.pascual@cstb.fr>
 Description: CSTBox Modbus devices support
-    This package adds to an existing CSTBox framework the support
-    for Modbus interfaced devices. 
-    It includes the models of currently support products.
+    This package adds the support for Modbus interfaced devices
+    to an existing CSTBox framework.
