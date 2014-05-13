@@ -2,16 +2,8 @@
 
 set -e
 
-# stop service, if running 
+. /etc/cstbox/setenv
+. $CSTBOX_LIB_DPKG/lib-maintscript
 
-PIDFILES_DIR=/var/run/cstbox
-SVC="cstbox-modbus"
-
-if [ -f $PIDFILES_DIR/$SVC.pid ] ; then
-    service $SVC stop
-fi
-
-# unregister service from init process
-
-#echo "Removing any system startup links for $svc..."
-#update-rc.d -f $SVC remove > /dev/null
+stop_service "cstbox-modbus"
+cleanup_pyc
