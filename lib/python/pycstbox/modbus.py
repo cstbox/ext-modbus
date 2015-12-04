@@ -30,10 +30,6 @@ class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'de
     :var decoder: a function which takes to register value and returns the corresponding real one
     :var encoder: a function which takes a real value and returns the corresponding register one
     """
-    @staticmethod
-    def identity(value):
-        return value
-
-    def __new__(cls, addr, size=1, cfgreg=False, decoder=identity, encoder=identity):
+    def __new__(cls, addr, size=1, cfgreg=False):
         """ Overridden __new__ allowing default values for tuple attributes. """
-        return super(ModbusRegister, cls).__new__(addr, size, cfgreg, encoder, decoder)
+        return super(ModbusRegister, cls).__new__(cls, addr, size, cfgreg)
