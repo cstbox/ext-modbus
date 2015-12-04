@@ -21,15 +21,15 @@
 from collections import namedtuple
 
 
-class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'decoder', 'encoder'])):
+class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg'])):
     """ Modbus register description.
 
     :var addr: register address
     :var int size: register size (in 16 bits words)
     :var bool cfgreg: True if this register is a configuration one
-    :var decoder: a function which takes to register value and returns the corresponding real one
-    :var encoder: a function which takes a real value and returns the corresponding register one
     """
+    __slots__ = ()
+
     def __new__(cls, addr, size=1, cfgreg=False):
         """ Overridden __new__ allowing default values for tuple attributes. """
         return super(ModbusRegister, cls).__new__(cls, addr, size, cfgreg)
