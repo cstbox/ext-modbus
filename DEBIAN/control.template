@@ -1,5 +1,5 @@
 Package: cstbox-ext-modbus
-Version: $(version)
+Version: %(version)s
 Section: base
 Priority: optional
 Architecture: all
