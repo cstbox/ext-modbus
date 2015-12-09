@@ -33,3 +33,13 @@ class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg'])):
     def __new__(cls, addr, size=1, cfgreg=False):
         """ Overridden __new__ allowing default values for tuple attributes. """
         return super(ModbusRegister, cls).__new__(cls, addr, size, cfgreg)
+
+    @staticmethod
+    def decode(raw):
+        """ Default decoding (identity)
+
+        :param raw: the register raw content
+        :return: the converted value
+        :rtype: int
+        """
+        return raw
