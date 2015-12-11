@@ -44,3 +44,11 @@ class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'si
         :rtype: int
         """
         return raw
+
+    @property
+    def unpack_format(self):
+        fmt = 'H' if self.size == 1 else 'I'
+        if self.signed:
+            return fmt.lower()
+        else:
+            return fmt
