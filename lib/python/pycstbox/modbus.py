@@ -21,18 +21,19 @@
 from collections import namedtuple
 
 
-class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg'])):
+class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'signed'])):
     """ Modbus register description.
 
     :var addr: register address
     :var int size: register size (in 16 bits words)
-    :var bool cfgreg: True if this register is a configuration one
+    :var bool cfgreg: True if this register is a configuration one (default: False)
+    :var bool signed: True if the value is signed (default: False)
     """
     __slots__ = ()
 
-    def __new__(cls, addr, size=1, cfgreg=False):
+    def __new__(cls, addr, size=1, cfgreg=False, signed=False):
         """ Overridden __new__ allowing default values for tuple attributes. """
-        return super(ModbusRegister, cls).__new__(cls, addr, size, cfgreg)
+        return super(ModbusRegister, cls).__new__(cls, addr, size, cfgreg, signed)
 
     @staticmethod
     def decode(raw):

@@ -43,6 +43,8 @@ if __name__ == '__main__':
 
         svc.log_setLevel_from_args(args)
         # load the configuration data for Modbus coordinators
+        # TODO check if the type filtering could not be removed
+        # (redundant with DeviceNetworkSvc.load_configuration process)
         svc.load_configuration(
             dict([(k, v) for k, v in cfg.iteritems() if v.type == 'modbus'])
         )
