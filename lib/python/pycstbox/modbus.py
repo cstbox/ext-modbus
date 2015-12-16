@@ -19,6 +19,11 @@
 """ Common definitions and helpers for Modbus devices support."""
 
 from collections import namedtuple
+import time
+
+import minimalmodbus
+
+from pycstbox.log import Loggable
 
 
 class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'signed'])):
@@ -52,3 +57,68 @@ class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'si
             return fmt.lower()
         else:
             return fmt
+
+
+class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
+    """ Base class for implementing Modbus equipements deriving from minimalmodbus.Instrument.
+
+    It takes care among other of communication errors recovery in a uniform way.
+    """
+    DEFAULT_BAUDRATE = 9600
+    DEFAULT_TIMEOUT = 2
+
+    def __init__(self, port, unit_id, logname, baudrate=DEFAULT_BAUDRATE):
+        """
+        :param str port: serial port on which the RS485 interface is connected
+        :param int unit_id: the address of the device
+        :param str logname: the (short) root for the name of the log
+        :param int baudrate: the serial communication baudrate
+        """
+        super(RTUModbusHWDevice, self).__init__(port=port, slaveaddress=int(unit_id))
+        self.serial.close()
+        self.serial.setBaudrate(baudrate)
+        self.serial.setTimeout(self.DEFAULT_TIMEOUT)
+        self.serial.open()
+        self.serial.flush()
+
+        self._first_poll = True
+        self.poll_req_interval = 0
+        self.terminate = False
+        self.communication_error = False
+
+        Loggable.__init__(self, logname='%s-%03d' % (logname, self.unit_id))
+
+    @property
+    def unit_id(self):
+        """ The id of the device """
+        return self.address
+
+    def _read_registers(self, start_addr=0, reg_count=1):
+        """ Read a bunch of registers and return the resulting raw data buffer
+
+        :param int start_addr: the address of the first register (default: 0)
+        :param int reg_count: the number of 16 bits registers to read (default: 1)
+        :return: the registers content as a string, or None if a communication error occurred
+        """
+        # ensure no junk is lurking there
+        self.serial.flush()
+
+        try:
+            data = self.read_string(start_addr, reg_count)
+        except ValueError:
+            # CRC error is reported as ValueError
+            # => reset the serial link, wait a bit and return empty data
+            self.log_error('trying to recover from error')
+            self.serial.close()
+            time.sleep(self.poll_req_interval)
+            self.serial.open()
+            self.communication_error = True
+
+            data = None
+
+        else:
+            if self.communication_error:
+                self.log_info('recovered from error')
+                self.communication_error = False
+
+        return data
