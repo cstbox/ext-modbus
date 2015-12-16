@@ -75,6 +75,7 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         :param int baudrate: the serial communication baudrate
         """
         super(RTUModbusHWDevice, self).__init__(port=port, slaveaddress=int(unit_id))
+
         self.serial.close()
         self.serial.setBaudrate(baudrate)
         self.serial.setTimeout(self.DEFAULT_TIMEOUT)
@@ -87,6 +88,16 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         self.communication_error = False
 
         Loggable.__init__(self, logname='%s-%03d' % (logname, self.unit_id))
+
+        self.log_info(
+            'created %s instance with configuration %s',
+            self.__class__.__name__,
+                {
+                    "port": port,
+                    "unit_id": unit_id,
+                    "baudrate": baudrate
+                }
+        )
 
     @property
     def unit_id(self):
