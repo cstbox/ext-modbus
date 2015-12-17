@@ -119,7 +119,7 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         except ValueError:
             # CRC error is reported as ValueError
             # => reset the serial link, wait a bit and return empty data
-            self.log_error('trying to recover from error')
+            self.log_warning('trying to recover from error')
             self.serial.close()
             time.sleep(self.poll_req_interval)
             self.serial.open()
