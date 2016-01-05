@@ -125,7 +125,7 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         """
         if self.total_requests and self.total_requests % self.STATS_INTERVAL == 0:
             self.log_info(
-                    'traffic stats: totreqs=%d totreads=%d toterrs=%d',
+                    'traffic stats: reqs=%d reads=%d errs=%d',
                     self.total_requests, self.total_reads, self.total_errors
             )
 
