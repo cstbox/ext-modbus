@@ -123,6 +123,12 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         :param int reg_count: the number of 16 bits registers to read (default: 1)
         :return: the registers content as a string, or None if a communication error occurred
         """
+        if self.total_requests and self.total_requests % self.STATS_INTERVAL == 0:
+            self.log_info(
+                    'traffic stats: totreqs=%d totreads=%d toterrs=%d',
+                    self.total_requests, self.total_reads, self.total_errors
+            )
+
         self.total_requests += 1
 
         if self.serial.isOpen():
@@ -163,10 +169,3 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
                     self.log_info('recovered from error')
                     self.communication_error = False
                 return data
-
-            finally:
-                if self.total_requests % self.STATS_INTERVAL == 0:
-                    self.log_info(
-                            'traffic stats: totreqs=%d totreads=%d toterrs=%d',
-                            self.total_requests, self.total_reads, self.total_errors
-                    )
