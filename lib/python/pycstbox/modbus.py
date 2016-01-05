@@ -67,6 +67,7 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
     DEFAULT_BAUDRATE = 9600
     DEFAULT_TIMEOUT = 2
     DEFAULT_RETRIES = 3
+    STATS_INTERVAL = 100
 
     def __init__(self, port, unit_id, logname, baudrate=DEFAULT_BAUDRATE, retries=DEFAULT_RETRIES):
         """
@@ -94,6 +95,10 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         self.terminate = False
         self.communication_error = False
 
+        self.total_requests = 0
+        self.total_reads = 0
+        self.total_errors = 0
+
         Loggable.__init__(self, logname='%s-%03d' % (logname, self.unit_id))
 
         self.log_info(
@@ -118,22 +123,28 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         :param int reg_count: the number of 16 bits registers to read (default: 1)
         :return: the registers content as a string, or None if a communication error occurred
         """
+        self.total_requests += 1
+
         if self.serial.isOpen():
             # ensure no junk is lurking there
             self.serial.flushInput()
             self.serial.flushOutput()
 
         attempts_left = self.retries
-        while attempts_left:
+        while True:
             try:
+                self.total_reads += 1
                 data = self.read_string(start_addr, reg_count)
 
             except ValueError:
+                self.total_errors += 1
+
                 # CRC error is reported as ValueError
                 attempts_left -= 1
 
                 # reset the serial link, wait a bit and retry until max attempts
                 if attempts_left:
+                    self.log_warning('trying to recover from error (attempts remaining=%d)', attempts_left)
                     self.serial.close()
                     time.sleep(self.poll_req_interval)
                     self.serial.open()
@@ -142,7 +153,7 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
                     self.serial.flushOutput()
 
                 else:
-                    self.log_warning('trying to recover from error')
+                    self.log_error('cannot recover from error, request ignored')
                     self.communication_error = True
 
                     return None
@@ -152,3 +163,10 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
                     self.log_info('recovered from error')
                     self.communication_error = False
                 return data
+
+            finally:
+                if self.total_requests % self.STATS_INTERVAL == 0:
+                    self.log_info(
+                            'traffic stats: totreqs=%d totreads=%d toterrs=%d',
+                            self.total_requests, self.total_reads, self.total_errors
+                    )
