@@ -66,8 +66,9 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
     """
     DEFAULT_BAUDRATE = 9600
     DEFAULT_TIMEOUT = 2
+    DEFAULT_RETRIES = 3
 
-    def __init__(self, port, unit_id, logname, baudrate=DEFAULT_BAUDRATE):
+    def __init__(self, port, unit_id, logname, baudrate=DEFAULT_BAUDRATE, retries=DEFAULT_RETRIES):
         """
         :param str port: serial port on which the RS485 interface is connected
         :param int unit_id: the address of the device
@@ -80,10 +81,16 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         self.serial.setBaudrate(baudrate)
         self.serial.setTimeout(self.DEFAULT_TIMEOUT)
         self.serial.open()
-        self.serial.flush()
+
+        # wait a bit to ensure we call clean it correctly (spurious data present
+        # sometimes when opening serial on RasPi)
+        time.sleep(0.1)
+        self.serial.flushInput()
+        self.serial.flushOutput()
 
         self._first_poll = True
         self.poll_req_interval = 0
+        self.retries = retries
         self.terminate = False
         self.communication_error = False
 
@@ -111,25 +118,37 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         :param int reg_count: the number of 16 bits registers to read (default: 1)
         :return: the registers content as a string, or None if a communication error occurred
         """
-        # ensure no junk is lurking there
-        self.serial.flush()
+        if self.serial.isOpen():
+            # ensure no junk is lurking there
+            self.serial.flushInput()
+            self.serial.flushOutput()
 
-        try:
-            data = self.read_string(start_addr, reg_count)
-        except ValueError:
-            # CRC error is reported as ValueError
-            # => reset the serial link, wait a bit and return empty data
-            self.log_warning('trying to recover from error')
-            self.serial.close()
-            time.sleep(self.poll_req_interval)
-            self.serial.open()
-            self.communication_error = True
+        attempts_left = self.retries
+        while attempts_left:
+            try:
+                data = self.read_string(start_addr, reg_count)
 
-            data = None
+            except ValueError:
+                # CRC error is reported as ValueError
+                attempts_left -= 1
 
-        else:
-            if self.communication_error:
-                self.log_info('recovered from error')
-                self.communication_error = False
+                # reset the serial link, wait a bit and retry until max attempts
+                if attempts_left:
+                    self.serial.close()
+                    time.sleep(self.poll_req_interval)
+                    self.serial.open()
+                    time.sleep(0.1)
+                    self.serial.flushInput()
+                    self.serial.flushOutput()
 
-        return data
+                else:
+                    self.log_warning('trying to recover from error')
+                    self.communication_error = True
+
+                    return None
+
+            else:
+                if self.communication_error:
+                    self.log_info('recovered from error')
+                    self.communication_error = False
+                return data
