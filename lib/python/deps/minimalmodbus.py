@@ -20,6 +20,10 @@
 .. moduleauthor:: Jonas Berg <pyhys@users.sourceforge.net>
 
 MinimalModbus: A Python driver for the Modbus RTU and Modbus ASCII protocols via serial port (via RS485 or RS232).
+
+.. important::
+
+    Modified by E. Pascual to force close after each call.
 """
 
 __author__   = 'Jonas Berg'
@@ -73,7 +77,7 @@ STOPBITS = 1
 TIMEOUT  = 0.05
 """Default value for the timeout value in seconds (float)."""
 
-CLOSE_PORT_AFTER_EACH_CALL = False
+CLOSE_PORT_AFTER_EACH_CALL = True
 """Default value for port closure setting."""
 
 #####################
@@ -856,7 +860,7 @@ class Instrument():
         if self.close_port_after_each_call:
             self.serial.open()
 
-        #self.serial.flushInput() TODO
+        self.serial.flushInput() # TODO
 
         if sys.version_info[0] > 2:
             request = bytes(request, encoding='latin1')  # Convert types to make it Python3 compatible
