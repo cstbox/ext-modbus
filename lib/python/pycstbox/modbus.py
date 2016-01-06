@@ -150,7 +150,7 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
 
                 # reset the serial link, wait a bit and retry until max attempts
                 if attempts_left:
-                    self.log_warning('trying to recover from error (attempts remaining=%d)', attempts_left)
+                    self.log_warning('trying to recover from CRC error (attempts remaining=%d)', attempts_left)
                     self.serial.close()
                     time.sleep(self.poll_req_interval)
                     self.serial.open()
