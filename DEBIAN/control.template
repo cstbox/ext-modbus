@@ -3,7 +3,7 @@ Version: %(version)s
 Section: embedded
 Priority: optional
 Architecture: all
-Depends: cstbox-core 
+Depends: cstbox-core, python-serial
 Maintainer: Eric Pascual <eric.pascual@cstb.fr>
 Description: CSTBox Modbus devices support
     This package adds the support for Modbus interfaced devices
