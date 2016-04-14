@@ -60,7 +60,7 @@ class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'si
 
 
 class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
-    """ Base class for implementing Modbus equipements deriving from minimalmodbus.Instrument.
+    """ Base class for implementing Modbus equipments deriving from minimalmodbus.Instrument.
 
     It takes care among other of communication errors recovery in a uniform way.
     """
