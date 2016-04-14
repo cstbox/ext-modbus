@@ -13,4 +13,4 @@ cstbox-*_all/
 deprecated/
 lib/python/pycstbox/__init__.py
 RELEASE-VERSION
-DEBIAN/control
+DEBIAN/controlfabfile-settings.py
