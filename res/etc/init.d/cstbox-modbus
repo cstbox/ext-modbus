@@ -19,6 +19,7 @@ NAME=cstbox-modbus
 DAEMON=/opt/cstbox/bin/modbusd.py
 DAEMON_ARGS=
 INIT_VERBOSE=yes
+CAN_FAIL=yes
 
 . /opt/cstbox/lib/init/init-functions
 
