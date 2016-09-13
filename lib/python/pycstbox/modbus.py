@@ -67,7 +67,7 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
     DEFAULT_BAUDRATE = 9600
     DEFAULT_TIMEOUT = 2
     DEFAULT_RETRIES = 3
-    STATS_INTERVAL = 100
+    STATS_INTERVAL = 1000
 
     def __init__(self, port, unit_id, logname, baudrate=DEFAULT_BAUDRATE, retries=DEFAULT_RETRIES):
         """
