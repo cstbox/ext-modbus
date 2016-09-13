@@ -14,3 +14,4 @@ deprecated/
 lib/python/pycstbox/__init__.py
 RELEASE-VERSION
 DEBIAN/controlfabfile-settings.py
+/DEBIAN/control
