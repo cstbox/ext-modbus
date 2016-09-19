@@ -122,6 +122,7 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         :param int start_addr: the address of the first register (default: 0)
         :param int reg_count: the number of 16 bits registers to read (default: 1)
         :return: the registers content as a string, or None if a communication error occurred
+        :rtype: str
         """
         if self.total_requests and self.total_requests % self.STATS_INTERVAL == 0:
             self.log_info(
