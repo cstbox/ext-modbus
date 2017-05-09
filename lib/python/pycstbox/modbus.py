@@ -20,10 +20,12 @@
 
 from collections import namedtuple
 import time
+import struct
 
 import minimalmodbus
 
 from pycstbox.log import Loggable
+from pycstbox.hal import HalError
 
 
 class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'signed'])):
@@ -170,3 +172,18 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
                     self.log_info('recovered from error')
                     self.communication_error = False
                 return data
+
+    def unpack_registers(self, start_addr=0, reg_count=1, unpack_format='>h'):
+        """ Reads and unpacks registers. 
+        
+        :param int start_addr: see :py:meth:`_read_registers`
+        :param int reg_count: see :py:meth:`_read_registers`
+        :param str unpack_format: unpack format as used by :py:meth:`struct.unpack`
+        :return: the register(s) content as a tuple
+        :rtype: tuple
+        :raise HalError: in case of read error
+        """
+        data = self._read_registers(start_addr, reg_count)
+        if data is None:
+            raise HalError('read register failed (start=%d count=%d)' % (start_addr, reg_count))
+        return struct.unpack_from(unpack_format, data)
