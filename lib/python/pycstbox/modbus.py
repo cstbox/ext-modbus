@@ -22,10 +22,23 @@ from collections import namedtuple
 import time
 import struct
 
-import minimalmodbus
-
 from pycstbox.log import Loggable
 from pycstbox.hal import HalError
+from pycstbox.hal.device import PolledDevice
+from pycstbox.minimalmodbus import register_serial_port, Instrument
+
+
+class RTUModbusHALDevice(PolledDevice):
+    """ RTU devices share the serial port on which the RS485 line is connected. """
+    def __init__(self, coord_cfg, dev_cfg):
+        # create the shared serial port in minimalmodbus dictionary if not yet known
+        register_serial_port(
+            coord_cfg.port,
+            baudrate=coord_cfg.baudrate, parity=coord_cfg.parity, bytesize=coord_cfg.bytesize,
+            stopbits=coord_cfg.stopbits, timeout=coord_cfg.timeout
+        )
+
+        super(RTUModbusHALDevice, self).__init__(coord_cfg, dev_cfg)
 
 
 class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'signed'])):
@@ -61,28 +74,25 @@ class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'si
             return fmt
 
 
-class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
+class RTUModbusHWDevice(Instrument, Loggable):
     """ Base class for implementing Modbus equipments deriving from minimalmodbus.Instrument.
 
     It takes care among other of communication errors recovery in a uniform way.
     """
-    DEFAULT_BAUDRATE = 9600
-    DEFAULT_TIMEOUT = 2
     DEFAULT_RETRIES = 3
     STATS_INTERVAL = 1000
 
-    def __init__(self, port, unit_id, logname, baudrate=DEFAULT_BAUDRATE, retries=DEFAULT_RETRIES):
+    def __init__(self, port, unit_id, logname, retries=DEFAULT_RETRIES):
         """
         :param str port: serial port on which the RS485 interface is connected
         :param int unit_id: the address of the device
         :param str logname: the (short) root for the name of the log
-        :param int baudrate: the serial communication baudrate
+        :param int retries: number of retries in case of communication errors
         """
         super(RTUModbusHWDevice, self).__init__(port=port, slaveaddress=int(unit_id))
 
         self.serial.close()
-        self.serial.setBaudrate(baudrate)
-        self.serial.setTimeout(self.DEFAULT_TIMEOUT)
+        time.sleep(0.05)
         self.serial.open()
 
         # wait a bit to ensure we call clean it correctly (spurious data present
@@ -106,11 +116,10 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
         self.log_info(
             'created %s instance with configuration %s',
             self.__class__.__name__,
-                {
-                    "port": port,
-                    "unit_id": unit_id,
-                    "baudrate": baudrate
-                }
+            {
+                "port": port,
+                "unit_id": unit_id
+            }
         )
 
     @property
@@ -173,16 +182,17 @@ class RTUModbusHWDevice(minimalmodbus.Instrument, Loggable):
                     self.communication_error = False
                 return data
 
-    def unpack_registers(self, start_addr=0, reg_count=1, unpack_format='>h'):
+    def unpack_registers(self, start_register, reg_count=1, unpack_format='>h'):
         """ Reads and unpacks registers. 
         
-        :param int start_addr: see :py:meth:`_read_registers`
+        :param ModbusRegister start_register: the register to start the read from
         :param int reg_count: see :py:meth:`_read_registers`
         :param str unpack_format: unpack format as used by :py:meth:`struct.unpack`
         :return: the register(s) content as a tuple
         :rtype: tuple
         :raise HalError: in case of read error
         """
+        start_addr = start_register.addr
         data = self._read_registers(start_addr, reg_count)
         if data is None:
             raise HalError('read register failed (start=%d count=%d)' % (start_addr, reg_count))
