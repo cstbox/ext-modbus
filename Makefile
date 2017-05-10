@@ -15,6 +15,5 @@ copy_files: \
 	copy_devices_metadata_files \
 	copy_bin_files \
 	copy_python_files \
-	copy_init_scripts \
-	copy_python_support_pkgs
+	copy_init_scripts
 
