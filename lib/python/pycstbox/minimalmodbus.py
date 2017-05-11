@@ -98,7 +98,15 @@ def register_serial_port(port,
     except KeyError:
         _SERIALPORTS[port] = sp = serial.Serial(port=port, **settings)
         if logger:
-            logger.info('serial port %s registered with settings %s', port, settings)
+            logger.info('serial port %s registered with settings :', port)
+            for k, v in settings.iteritems():
+                logger.info('- %-10s : %s', k, v)
+
+        time.sleep(0.5)
+        sp.flushInput()
+        sp.flushOutput()
+        time.sleep(0.5)
+
     else:
         if any([getattr(sp, k) != v] for k, v in settings.items()):
             msg = 'port %s already registered with different settings' % port
