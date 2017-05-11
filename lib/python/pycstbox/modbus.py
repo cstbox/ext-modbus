@@ -21,22 +21,28 @@
 from collections import namedtuple
 import time
 import struct
+import logging
 
 from pycstbox.log import Loggable
 from pycstbox.hal import HalError
 from pycstbox.hal.device import PolledDevice
-from pycstbox.minimalmodbus import register_serial_port, Instrument
+from pycstbox.minimalmodbus import register_serial_port, Instrument, BAUDRATE, PARITY, BYTESIZE, STOPBITS, TIMEOUT
+
+_logger = logging.getLogger('modbus')
 
 
 class RTUModbusHALDevice(PolledDevice):
     """ RTU devices share the serial port on which the RS485 line is connected. """
     def __init__(self, coord_cfg, dev_cfg):
         # create the shared serial port in minimalmodbus dictionary if not yet known
-        register_serial_port(
-            coord_cfg.port,
-            baudrate=coord_cfg.baudrate, parity=coord_cfg.parity, bytesize=coord_cfg.bytesize,
-            stopbits=coord_cfg.stopbits, timeout=coord_cfg.timeout
+        port_cfg = dict(
+            baudrate=getattr(coord_cfg, 'baudrate', BAUDRATE),
+            parity=getattr(coord_cfg, 'parity', PARITY),
+            bytesize=getattr(coord_cfg, 'bytesize', BYTESIZE),
+            stopbits=getattr(coord_cfg, 'stopbits', STOPBITS),
+            timeout=getattr(coord_cfg, 'timeout', TIMEOUT)
         )
+        register_serial_port(coord_cfg.port, logger=_logger, **port_cfg)
 
         super(RTUModbusHALDevice, self).__init__(coord_cfg, dev_cfg)
 
