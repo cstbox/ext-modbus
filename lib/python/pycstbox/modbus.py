@@ -97,16 +97,6 @@ class RTUModbusHWDevice(Instrument, Loggable):
         """
         super(RTUModbusHWDevice, self).__init__(port=port, slaveaddress=int(unit_id))
 
-        self.serial.close()
-        time.sleep(0.05)
-        self.serial.open()
-
-        # wait a bit to ensure we call clean it correctly (spurious data present
-        # sometimes when opening serial on RasPi)
-        time.sleep(0.1)
-        self.serial.flushInput()
-        self.serial.flushOutput()
-
         self._first_poll = True
         self.poll_req_interval = 0
         self.retries = retries
@@ -119,14 +109,7 @@ class RTUModbusHWDevice(Instrument, Loggable):
 
         Loggable.__init__(self, logname='%s-%03d' % (logname, self.unit_id))
 
-        self.log_info(
-            'created %s instance with configuration %s',
-            self.__class__.__name__,
-            {
-                "port": port,
-                "unit_id": unit_id
-            }
-        )
+        self.log_info('created %s instance with unit id=%d on port %s', self.__class__.__name__, unit_id, port)
 
     @property
     def unit_id(self):
