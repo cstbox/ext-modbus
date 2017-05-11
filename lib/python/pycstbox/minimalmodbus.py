@@ -24,20 +24,19 @@ MinimalModbus: A Python driver for the Modbus RTU and Modbus ASCII protocols via
 Modified by E. PASCUAL (eric.pascual@cstb.fr) for local adaptations 
 """
 
-__author__   = 'Jonas Berg'
-__email__    = 'pyhys@users.sourceforge.net'
-__url__      = 'https://github.com/pyhys/minimalmodbus'
-__license__  = 'Apache License, Version 2.0'
-
-__version__  = '0.8'
-__status__   = 'Beta'
-
-
 import os
 import serial
 import struct
 import sys
 import time
+
+__author__ = 'Jonas Berg'
+__email__ = 'pyhys@users.sourceforge.net'
+__url__ = 'https://github.com/pyhys/minimalmodbus'
+__license__ = 'Apache License, Version 2.0'
+
+__version__ = '0.8'
+__status__ = 'Beta'
 
 if sys.version > '3':
     import binascii
@@ -56,14 +55,14 @@ _ASCII_FOOTER = '\r\n'
 _SERIALPORTS = {}
 _LATEST_READ_TIMES = {}
 
-####################
-## Default values ##
-####################
+##################
+# Default values #
+##################
 
 BAUDRATE = 19200
 """Default value for the baudrate in Baud (int)."""
 
-PARITY   = serial.PARITY_NONE
+PARITY = serial.PARITY_NONE
 """Default value for the parity. See the pySerial module for documentation. Defaults to serial.PARITY_NONE"""
 
 BYTESIZE = 8
@@ -72,38 +71,41 @@ BYTESIZE = 8
 STOPBITS = 1
 """Default value for the number of stopbits (int)."""
 
-TIMEOUT  = 0.05
+TIMEOUT = 0.05
 """Default value for the timeout value in seconds (float)."""
 
 CLOSE_PORT_AFTER_EACH_CALL = False
 """Default value for port closure setting."""
 
-#####################
-## Named constants ##
-#####################
+###################
+# Named constants #
+###################
 
-MODE_RTU   = 'rtu'
+MODE_RTU = 'rtu'
 MODE_ASCII = 'ascii'
 
 
-######################################
-## Serial ports registry management ##
-######################################
+####################################
+# Serial ports registry management #
+####################################
 
-def register_serial_port(port, baudrate=BAUDRATE, parity=PARITY, bytesize=BYTESIZE, stopbits=STOPBITS, timeout=TIMEOUT):
+def register_serial_port(port,
+                         baudrate=BAUDRATE, parity=PARITY, bytesize=BYTESIZE, stopbits=STOPBITS, timeout=TIMEOUT,
+                         logger=None):
+    settings = dict(baudrate=baudrate, parity=parity, bytesize=bytesize, stopbits=stopbits, timeout=timeout)
     try:
         sp = _SERIALPORTS[port]
     except KeyError:
-        _SERIALPORTS[port] = sp = serial.Serial(
-            port=port, baudrate=baudrate, parity=parity, bytesize=bytesize, stopbits=stopbits, timeout=timeout
-        )
+        _SERIALPORTS[port] = sp = serial.Serial(port=port, **settings)
+        if logger:
+            logger.info('serial port %s registered with settings %s', port, settings)
     else:
-        if sp.baudrate != baudrate \
-                or sp.parity != parity \
-                or sp.bytesize != bytesize \
-                or sp.stopbits != stopbits \
-                or sp.timeout != timeout:
-            raise ValueError('port %s is already declared with different settings' % port)
+        if any([getattr(sp, k) != v] for k, v in settings.items()):
+            msg = 'port %s already registered with different settings' % port
+            raise ValueError(msg)
+
+        if logger:
+            logger.info('serial port %s already registered', port)
 
     return sp
 
@@ -111,12 +113,13 @@ def register_serial_port(port, baudrate=BAUDRATE, parity=PARITY, bytesize=BYTESI
 def get_serial_port(port):
     return _SERIALPORTS[port]
 
-##############################
-## Modbus instrument object ##
-##############################
+
+############################
+# Modbus instrument object #
+############################
 
 
-class Instrument():
+class Instrument(object):
     """Instrument class for talking to instruments (slaves) via the Modbus RTU or ASCII protocols (via RS485 or RS232).
 
     Args:
@@ -144,30 +147,34 @@ class Instrument():
         """Set this to :const:`True` to print the communication details. Defaults to :const:`False`."""
 
         self.close_port_after_each_call = CLOSE_PORT_AFTER_EACH_CALL
-        """If this is :const:`True`, the serial port will be closed after each call. Defaults to :data:`CLOSE_PORT_AFTER_EACH_CALL`. To change it, set the value ``minimalmodbus.CLOSE_PORT_AFTER_EACH_CALL=True`` ."""
+        """ If this is :const:`True`, the serial port will be closed after each call. 
+        Defaults to :data:`CLOSE_PORT_AFTER_EACH_CALL`. To change it, set the value 
+        ``minimalmodbus.CLOSE_PORT_AFTER_EACH_CALL=True`` . 
+        """
 
         self.precalculate_read_size = True
-        """If this is :const:`False`, the serial port reads until timeout
+        """ If this is :const:`False`, the serial port reads until timeout
         instead of just reading a specific number of bytes. Defaults to :const:`True`.
 
         New in version 0.5.
         """
-        
+
         self.handle_local_echo = False
-        """Set to to :const:`True` if your RS-485 adaptor has local echo enabled. 
-        Then the transmitted message will immeadiately appear at the receive line of the RS-485 adaptor.
+        """ Set to to :const:`True` if your RS-485 adaptor has local echo enabled. 
+        Then the transmitted message will immediately appear at the receive line of the RS-485 adaptor.
         MinimalModbus will then read and discard this data, before reading the data from the slave.
         Defaults to :const:`False`.
 
         New in version 0.7.
         """
 
-        if  self.close_port_after_each_call:
+        if self.close_port_after_each_call:
             self.serial.close()
 
     def __repr__(self):
-        """String representation of the :class:`.Instrument` object."""
-        return "{}.{}<id=0x{:x}, address={}, mode={}, close_port_after_each_call={}, precalculate_read_size={}, debug={}, serial={}>".format(
+        """ String representation of the :class:`.Instrument` object. """
+        return "{}.{}<id=0x{:x}, address={}, mode={}, close_port_after_each_call={}, precalculate_read_size={}, " \
+               "debug={}, serial={}>".format(
             self.__module__,
             self.__class__.__name__,
             id(self),
@@ -177,12 +184,11 @@ class Instrument():
             self.precalculate_read_size,
             self.debug,
             self.serial,
-            )
+        )
 
-    ######################################
-    ## Methods for talking to the slave ##
-    ######################################
-
+    ####################################
+    # Methods for talking to the slave #
+    ####################################
 
     def read_bit(self, registeraddress, functioncode=2):
         """Read one bit from the slave.
@@ -200,7 +206,6 @@ class Instrument():
         """
         _checkFunctioncode(functioncode, [1, 2])
         return self._genericCommand(functioncode, registeraddress)
-
 
     def write_bit(self, registeraddress, value, functioncode=5):
         """Write one bit to the slave.
@@ -220,7 +225,6 @@ class Instrument():
         _checkFunctioncode(functioncode, [5, 15])
         _checkInt(value, minvalue=0, maxvalue=1, description='input value')
         self._genericCommand(functioncode, registeraddress, value)
-
 
     def read_register(self, registeraddress, numberOfDecimals=0, functioncode=3, signed=False):
         """Read an integer from one 16-bit register in the slave, possibly scaling it.
@@ -266,7 +270,6 @@ class Instrument():
         _checkBool(signed, description='signed')
         return self._genericCommand(functioncode, registeraddress, numberOfDecimals=numberOfDecimals, signed=signed)
 
-
     def write_register(self, registeraddress, value, numberOfDecimals=0, functioncode=16, signed=False):
         """Write an integer to one 16-bit register in the slave, possibly scaling it.
 
@@ -304,7 +307,6 @@ class Instrument():
 
         self._genericCommand(functioncode, registeraddress, value, numberOfDecimals, signed=signed)
 
-
     def read_long(self, registeraddress, functioncode=3, signed=False):
         """Read a long integer (32 bits) from the slave.
 
@@ -331,8 +333,8 @@ class Instrument():
         """
         _checkFunctioncode(functioncode, [3, 4])
         _checkBool(signed, description='signed')
-        return self._genericCommand(functioncode, registeraddress, numberOfRegisters=2, signed=signed, payloadformat='long')
-
+        return self._genericCommand(functioncode, registeraddress, numberOfRegisters=2, signed=signed,
+                                    payloadformat='long')
 
     def write_long(self, registeraddress, value, signed=False):
         """Write a long integer (32 bits) to the slave.
@@ -356,13 +358,12 @@ class Instrument():
             ValueError, TypeError, IOError
 
         """
-        MAX_VALUE_LONG =  4294967295  # Unsigned INT32
+        MAX_VALUE_LONG = 4294967295  # Unsigned INT32
         MIN_VALUE_LONG = -2147483648  # INT32
 
         _checkInt(value, minvalue=MIN_VALUE_LONG, maxvalue=MAX_VALUE_LONG, description='input value')
         _checkBool(signed, description='signed')
         self._genericCommand(16, registeraddress, value, numberOfRegisters=2, signed=signed, payloadformat='long')
-
 
     def read_float(self, registeraddress, functioncode=3, numberOfRegisters=2):
         """Read a floating point number from the slave.
@@ -398,8 +399,8 @@ class Instrument():
         """
         _checkFunctioncode(functioncode, [3, 4])
         _checkInt(numberOfRegisters, minvalue=2, maxvalue=4, description='number of registers')
-        return self._genericCommand(functioncode, registeraddress, numberOfRegisters=numberOfRegisters, payloadformat='float')
-
+        return self._genericCommand(functioncode, registeraddress, numberOfRegisters=numberOfRegisters,
+                                    payloadformat='float')
 
     def write_float(self, registeraddress, value, numberOfRegisters=2):
         """Write a floating point number to the slave.
@@ -425,8 +426,7 @@ class Instrument():
         _checkNumerical(value, description='input value')
         _checkInt(numberOfRegisters, minvalue=2, maxvalue=4, description='number of registers')
         self._genericCommand(16, registeraddress, value, \
-            numberOfRegisters=numberOfRegisters, payloadformat='float')
-
+                             numberOfRegisters=numberOfRegisters, payloadformat='float')
 
     def read_string(self, registeraddress, numberOfRegisters=16, functioncode=3):
         """Read a string from the slave.
@@ -449,8 +449,7 @@ class Instrument():
         _checkFunctioncode(functioncode, [3, 4])
         _checkInt(numberOfRegisters, minvalue=1, description='number of registers for read string')
         return self._genericCommand(functioncode, registeraddress, \
-            numberOfRegisters=numberOfRegisters, payloadformat='string')
-
+                                    numberOfRegisters=numberOfRegisters, payloadformat='string')
 
     def write_string(self, registeraddress, textstring, numberOfRegisters=16):
         """Write a string to the slave.
@@ -478,8 +477,7 @@ class Instrument():
         _checkInt(numberOfRegisters, minvalue=1, description='number of registers for write string')
         _checkString(textstring, 'input string', minlength=1, maxlength=2 * numberOfRegisters)
         self._genericCommand(16, registeraddress, textstring, \
-            numberOfRegisters=numberOfRegisters, payloadformat='string')
-
+                             numberOfRegisters=numberOfRegisters, payloadformat='string')
 
     def read_registers(self, registeraddress, numberOfRegisters, functioncode=3):
         """Read integers from 16-bit registers in the slave.
@@ -504,8 +502,7 @@ class Instrument():
         _checkFunctioncode(functioncode, [3, 4])
         _checkInt(numberOfRegisters, minvalue=1, description='number of registers')
         return self._genericCommand(functioncode, registeraddress, \
-            numberOfRegisters=numberOfRegisters, payloadformat='registers')
-
+                                    numberOfRegisters=numberOfRegisters, payloadformat='registers')
 
     def write_registers(self, registeraddress, values):
         """Write integers to 16-bit registers in the slave.
@@ -537,13 +534,12 @@ class Instrument():
 
         self._genericCommand(16, registeraddress, values, numberOfRegisters=len(values), payloadformat='registers')
 
-    #####################
-    ## Generic command ##
-    #####################
-
+    ###################
+    # Generic command #
+    ###################
 
     def _genericCommand(self, functioncode, registeraddress, value=None, \
-            numberOfDecimals=0, numberOfRegisters=1, signed=False, payloadformat=None):
+                        numberOfDecimals=0, numberOfRegisters=1, signed=False, payloadformat=None):
         """Generic command for reading and writing registers and bits.
 
         Args:
@@ -576,17 +572,18 @@ class Instrument():
 
         # Payload format constants, so datatypes can be told apart.
         # Note that bit datatype not is included, because it uses other functioncodes.
-        PAYLOADFORMAT_LONG      = 'long'
-        PAYLOADFORMAT_FLOAT     = 'float'
-        PAYLOADFORMAT_STRING    = 'string'
-        PAYLOADFORMAT_REGISTER  = 'register'
+        PAYLOADFORMAT_LONG = 'long'
+        PAYLOADFORMAT_FLOAT = 'float'
+        PAYLOADFORMAT_STRING = 'string'
+        PAYLOADFORMAT_REGISTER = 'register'
         PAYLOADFORMAT_REGISTERS = 'registers'
 
         ALL_PAYLOADFORMATS = [PAYLOADFORMAT_LONG, PAYLOADFORMAT_FLOAT, \
-            PAYLOADFORMAT_STRING, PAYLOADFORMAT_REGISTER, PAYLOADFORMAT_REGISTERS]
+                              PAYLOADFORMAT_STRING, PAYLOADFORMAT_REGISTER, PAYLOADFORMAT_REGISTERS]
 
         ## Check input values ##
-        _checkFunctioncode(functioncode, ALL_ALLOWED_FUNCTIONCODES)  # Note: The calling facade functions should validate this
+        _checkFunctioncode(functioncode,
+                           ALL_ALLOWED_FUNCTIONCODES)  # Note: The calling facade functions should validate this
         _checkRegisteraddress(registeraddress)
         _checkInt(numberOfDecimals, minvalue=0, description='number of decimals')
         _checkInt(numberOfRegisters, minvalue=1, maxvalue=MAX_NUMBER_OF_REGISTERS, description='number of registers')
@@ -599,43 +596,43 @@ class Instrument():
         ## Check combinations of input parameters ##
         numberOfRegisterBytes = numberOfRegisters * _NUMBER_OF_BYTES_PER_REGISTER
 
-                    # Payload format
+        # Payload format
         if functioncode in [3, 4, 6, 16] and payloadformat is None:
             payloadformat = PAYLOADFORMAT_REGISTER
 
         if functioncode in [3, 4, 6, 16]:
             if payloadformat not in ALL_PAYLOADFORMATS:
-                raise ValueError('The payload format is unknown. Given format: {0!r}, functioncode: {1!r}.'.\
-                    format(payloadformat, functioncode))
+                raise ValueError('The payload format is unknown. Given format: {0!r}, functioncode: {1!r}.'. \
+                                 format(payloadformat, functioncode))
         else:
             if payloadformat is not None:
                 raise ValueError('The payload format given is not allowed for this function code. ' + \
-                    'Given format: {0!r}, functioncode: {1!r}.'.format(payloadformat, functioncode))
+                                 'Given format: {0!r}, functioncode: {1!r}.'.format(payloadformat, functioncode))
 
-                    # Signed and numberOfDecimals
+                # Signed and numberOfDecimals
         if signed:
             if payloadformat not in [PAYLOADFORMAT_REGISTER, PAYLOADFORMAT_LONG]:
                 raise ValueError('The "signed" parameter can not be used for this data format. ' + \
-                    'Given format: {0!r}.'.format(payloadformat))
+                                 'Given format: {0!r}.'.format(payloadformat))
 
         if numberOfDecimals > 0 and payloadformat != PAYLOADFORMAT_REGISTER:
             raise ValueError('The "numberOfDecimals" parameter can not be used for this data format. ' + \
-                'Given format: {0!r}.'.format(payloadformat))
+                             'Given format: {0!r}.'.format(payloadformat))
 
-                    # Number of registers
+            # Number of registers
         if functioncode not in [3, 4, 16] and numberOfRegisters != 1:
             raise ValueError('The numberOfRegisters is not valid for this function code. ' + \
-                'NumberOfRegisters: {0!r}, functioncode {1}.'.format(numberOfRegisters, functioncode))
+                             'NumberOfRegisters: {0!r}, functioncode {1}.'.format(numberOfRegisters, functioncode))
 
         if functioncode == 16 and payloadformat == PAYLOADFORMAT_REGISTER and numberOfRegisters != 1:
             raise ValueError('Wrong numberOfRegisters when writing to a ' + \
-                'single register. Given {0!r}.'.format(numberOfRegisters))
+                             'single register. Given {0!r}.'.format(numberOfRegisters))
             # Note: For function code 16 there is checking also in the content conversion functions.
 
-                    # Value
+            # Value
         if functioncode in [5, 6, 15, 16] and value is None:
             raise ValueError('The input value is not valid for this function code. ' + \
-                'Given {0!r} and {1}.'.format(value, functioncode))
+                             'Given {0!r} and {1}.'.format(value, functioncode))
 
         if functioncode == 16 and payloadformat in [PAYLOADFORMAT_REGISTER, PAYLOADFORMAT_FLOAT, PAYLOADFORMAT_LONG]:
             _checkNumerical(value, description='input value')
@@ -643,42 +640,42 @@ class Instrument():
         if functioncode == 6 and payloadformat == PAYLOADFORMAT_REGISTER:
             _checkNumerical(value, description='input value')
 
-                    # Value for string
+            # Value for string
         if functioncode == 16 and payloadformat == PAYLOADFORMAT_STRING:
             _checkString(value, 'input string', minlength=1, maxlength=numberOfRegisterBytes)
             # Note: The string might be padded later, so the length might be shorter than numberOfRegisterBytes.
 
-                    # Value for registers
+            # Value for registers
         if functioncode == 16 and payloadformat == PAYLOADFORMAT_REGISTERS:
             if not isinstance(value, list):
                 raise TypeError('The value parameter must be a list. Given {0!r}.'.format(value))
 
             if len(value) != numberOfRegisters:
                 raise ValueError('The list length does not match number of registers. ' + \
-                    'List: {0!r},  Number of registers: {1!r}.'.format(value, numberOfRegisters))
+                                 'List: {0!r},  Number of registers: {1!r}.'.format(value, numberOfRegisters))
 
         ## Build payload to slave ##
         if functioncode in [1, 2]:
             payloadToSlave = _numToTwoByteString(registeraddress) + \
-                            _numToTwoByteString(NUMBER_OF_BITS)
+                             _numToTwoByteString(NUMBER_OF_BITS)
 
         elif functioncode in [3, 4]:
             payloadToSlave = _numToTwoByteString(registeraddress) + \
-                            _numToTwoByteString(numberOfRegisters)
+                             _numToTwoByteString(numberOfRegisters)
 
         elif functioncode == 5:
             payloadToSlave = _numToTwoByteString(registeraddress) + \
-                            _createBitpattern(functioncode, value)
+                             _createBitpattern(functioncode, value)
 
         elif functioncode == 6:
             payloadToSlave = _numToTwoByteString(registeraddress) + \
-                            _numToTwoByteString(value, numberOfDecimals, signed=signed)
+                             _numToTwoByteString(value, numberOfDecimals, signed=signed)
 
         elif functioncode == 15:
             payloadToSlave = _numToTwoByteString(registeraddress) + \
-                            _numToTwoByteString(NUMBER_OF_BITS) + \
-                            _numToOneByteString(NUMBER_OF_BYTES_FOR_ONE_BIT) + \
-                            _createBitpattern(functioncode, value)
+                             _numToTwoByteString(NUMBER_OF_BITS) + \
+                             _numToOneByteString(NUMBER_OF_BYTES_FOR_ONE_BIT) + \
+                             _createBitpattern(functioncode, value)
 
         elif functioncode == 16:
             if payloadformat == PAYLOADFORMAT_REGISTER:
@@ -698,14 +695,14 @@ class Instrument():
 
             assert len(registerdata) == numberOfRegisterBytes
             payloadToSlave = _numToTwoByteString(registeraddress) + \
-                            _numToTwoByteString(numberOfRegisters) + \
-                            _numToOneByteString(numberOfRegisterBytes) + \
-                            registerdata
+                             _numToTwoByteString(numberOfRegisters) + \
+                             _numToOneByteString(numberOfRegisterBytes) + \
+                             registerdata
 
-        ## Communicate ##
+        # Communicate
         payloadFromSlave = self._performCommand(functioncode, payloadToSlave)
 
-        ## Check the contents in the response payload ##
+        # Check the contents in the response payload
         if functioncode in [1, 2, 3, 4]:
             _checkResponseByteCount(payloadFromSlave)  # response byte count
 
@@ -717,7 +714,7 @@ class Instrument():
 
         if functioncode == 6:
             _checkResponseWriteData(payloadFromSlave, \
-                _numToTwoByteString(value, numberOfDecimals, signed=signed))  # response write data
+                                    _numToTwoByteString(value, numberOfDecimals, signed=signed))  # response write data
 
         if functioncode == 15:
             _checkResponseNumberOfRegisters(payloadFromSlave, NUMBER_OF_BITS)  # response number of bits
@@ -725,12 +722,12 @@ class Instrument():
         if functioncode == 16:
             _checkResponseNumberOfRegisters(payloadFromSlave, numberOfRegisters)  # response number of registers
 
-        ## Calculate return value ##
+        # Calculate return value
         if functioncode in [1, 2]:
             registerdata = payloadFromSlave[NUMBER_OF_BYTES_BEFORE_REGISTERDATA:]
             if len(registerdata) != NUMBER_OF_BYTES_FOR_ONE_BIT:
                 raise ValueError('The registerdata length does not match NUMBER_OF_BYTES_FOR_ONE_BIT. ' + \
-                    'Given {0}.'.format(len(registerdata)))
+                                 'Given {0}.'.format(len(registerdata)))
 
             return _bitResponseToValue(registerdata)
 
@@ -738,7 +735,7 @@ class Instrument():
             registerdata = payloadFromSlave[NUMBER_OF_BYTES_BEFORE_REGISTERDATA:]
             if len(registerdata) != numberOfRegisterBytes:
                 raise ValueError('The registerdata length does not match number of register bytes. ' + \
-                    'Given {0!r} and {1!r}.'.format(len(registerdata), numberOfRegisterBytes))
+                                 'Given {0!r} and {1!r}.'.format(len(registerdata), numberOfRegisterBytes))
 
             if payloadformat == PAYLOADFORMAT_STRING:
                 return _bytestringToTextstring(registerdata, numberOfRegisters)
@@ -756,12 +753,11 @@ class Instrument():
                 return _twoByteStringToNum(registerdata, numberOfDecimals, signed=signed)
 
             raise ValueError('Wrong payloadformat for return value generation. ' + \
-                'Given {0}'.format(payloadformat))
+                             'Given {0}'.format(payloadformat))
 
-    ##########################################
-    ## Communication implementation details ##
-    ##########################################
-
+    ########################################
+    # Communication implementation details #
+    ########################################
 
     def _performCommand(self, functioncode, payloadToSlave):
         """Performs the command having the *functioncode*.
@@ -797,7 +793,7 @@ class Instrument():
             except:
                 if self.debug:
                     template = 'MinimalModbus debug mode. Could not precalculate response size for Modbus {} mode. ' + \
-                        'Will read {} bytes. request: {!r}'
+                               'Will read {} bytes. request: {!r}'
                     _print_out(template.format(self.mode, number_of_bytes_to_read, request))
 
         # Communicate
@@ -806,7 +802,6 @@ class Instrument():
         # Extract payload
         payloadFromSlave = _extractPayload(response, self.address, self.mode, functioncode)
         return payloadFromSlave
-
 
     def _communicate(self, request, number_of_bytes_to_read):
         """Talk to the slave via a serial port.
@@ -860,26 +855,26 @@ class Instrument():
 
         if self.debug:
             _print_out('\nMinimalModbus debug mode. Writing to instrument (expecting {} bytes back): {!r} ({})'. \
-                format(number_of_bytes_to_read, request, _hexlify(request)))
+                       format(number_of_bytes_to_read, request, _hexlify(request)))
 
         if self.close_port_after_each_call:
             self.serial.open()
 
-        #self.serial.flushInput() TODO
+        # self.serial.flushInput() TODO
 
         if sys.version_info[0] > 2:
             request = bytes(request, encoding='latin1')  # Convert types to make it Python3 compatible
 
         # Sleep to make sure 3.5 character times have passed
-        minimum_silent_period   = _calculate_minimum_silent_period(self.serial.baudrate)
-        time_since_read         = time.time() - _LATEST_READ_TIMES.get(self.serial.port, 0)
+        minimum_silent_period = _calculate_minimum_silent_period(self.serial.baudrate)
+        time_since_read = time.time() - _LATEST_READ_TIMES.get(self.serial.port, 0)
 
         if time_since_read < minimum_silent_period:
             sleep_time = minimum_silent_period - time_since_read
 
             if self.debug:
                 template = 'MinimalModbus debug mode. Sleeping for {:.1f} ms. ' + \
-                        'Minimum silent period: {:.1f} ms, time since read: {:.1f} ms.'
+                           'Minimum silent period: {:.1f} ms, time since read: {:.1f} ms.'
                 text = template.format(
                     sleep_time * _SECONDS_TO_MILLISECONDS,
                     minimum_silent_period * _SECONDS_TO_MILLISECONDS,
@@ -890,7 +885,7 @@ class Instrument():
 
         elif self.debug:
             template = 'MinimalModbus debug mode. No sleep required before write. ' + \
-                'Time since previous read: {:.1f} ms, minimum silent period: {:.2f} ms.'
+                       'Time since previous read: {:.1f} ms, minimum silent period: {:.2f} ms.'
             text = template.format(
                 time_since_read * _SECONDS_TO_MILLISECONDS,
                 minimum_silent_period * _SECONDS_TO_MILLISECONDS)
@@ -898,19 +893,19 @@ class Instrument():
 
         # Write request
         latest_write_time = time.time()
-        
+
         self.serial.write(request)
 
         # Read and discard local echo
         if self.handle_local_echo:
             localEchoToDiscard = self.serial.read(len(request))
             if self.debug:
-                template = 'MinimalModbus debug mode. Discarding this local echo: {!r} ({} bytes).' 
+                template = 'MinimalModbus debug mode. Discarding this local echo: {!r} ({} bytes).'
                 text = template.format(localEchoToDiscard, len(localEchoToDiscard))
                 _print_out(text)
             if localEchoToDiscard != request:
                 template = 'Local echo handling is enabled, but the local echo does not match the sent request. ' + \
-                    'Request: {!r} ({} bytes), local echo: {!r} ({} bytes).' 
+                           'Request: {!r} ({} bytes), local echo: {!r} ({} bytes).'
                 text = template.format(request, len(request), localEchoToDiscard, len(localEchoToDiscard))
                 raise IOError(text)
 
@@ -926,7 +921,7 @@ class Instrument():
 
         if self.debug:
             template = 'MinimalModbus debug mode. Response from instrument: {!r} ({}) ({} bytes), ' + \
-                'roundtrip time: {:.1f} ms. Timeout setting: {:.1f} ms.\n'
+                       'roundtrip time: {:.1f} ms. Timeout setting: {:.1f} ms.\n'
             text = template.format(
                 answer,
                 _hexlify(answer),
@@ -940,10 +935,10 @@ class Instrument():
 
         return answer
 
+
 ####################
 # Payload handling #
 ####################
-
 
 def _embedPayload(slaveaddress, mode, functioncode, payloaddata):
     """Build a request from the slaveaddress, the function code and the payload data.
@@ -977,9 +972,9 @@ def _embedPayload(slaveaddress, mode, functioncode, payloaddata):
 
     if mode == MODE_ASCII:
         request = _ASCII_HEADER + \
-                _hexencode(firstPart) + \
-                _hexencode(_calculateLrcString(firstPart)) + \
-                _ASCII_FOOTER
+                  _hexencode(firstPart) + \
+                  _hexencode(_calculateLrcString(firstPart)) + \
+                  _ASCII_FOOTER
     else:
         request = firstPart + _calculateCrcString(firstPart)
 
@@ -1008,18 +1003,18 @@ def _extractPayload(response, slaveaddress, mode, functioncode):
     For development purposes, this function can also be used to extract the payload from the request sent TO the slave.
 
     """
-    BYTEPOSITION_FOR_ASCII_HEADER          = 0  # Relative to plain response
+    BYTEPOSITION_FOR_ASCII_HEADER = 0  # Relative to plain response
 
-    BYTEPOSITION_FOR_SLAVEADDRESS          = 0  # Relative to (stripped) response
-    BYTEPOSITION_FOR_FUNCTIONCODE          = 1
+    BYTEPOSITION_FOR_SLAVEADDRESS = 0  # Relative to (stripped) response
+    BYTEPOSITION_FOR_FUNCTIONCODE = 1
 
-    NUMBER_OF_RESPONSE_STARTBYTES          = 2  # Number of bytes before the response payload (in stripped response)
-    NUMBER_OF_CRC_BYTES                    = 2
-    NUMBER_OF_LRC_BYTES                    = 1
+    NUMBER_OF_RESPONSE_STARTBYTES = 2  # Number of bytes before the response payload (in stripped response)
+    NUMBER_OF_CRC_BYTES = 2
+    NUMBER_OF_LRC_BYTES = 1
     BITNUMBER_FUNCTIONCODE_ERRORINDICATION = 7
 
-    MINIMAL_RESPONSE_LENGTH_RTU            = NUMBER_OF_RESPONSE_STARTBYTES + NUMBER_OF_CRC_BYTES
-    MINIMAL_RESPONSE_LENGTH_ASCII          = 9
+    MINIMAL_RESPONSE_LENGTH_RTU = NUMBER_OF_RESPONSE_STARTBYTES + NUMBER_OF_CRC_BYTES
+    MINIMAL_RESPONSE_LENGTH_ASCII = 9
 
     # Argument validity testing
     _checkString(response, description='response')
@@ -1036,16 +1031,17 @@ def _extractPayload(response, slaveaddress, mode, functioncode):
                 MINIMAL_RESPONSE_LENGTH_ASCII,
                 response))
     elif len(response) < MINIMAL_RESPONSE_LENGTH_RTU:
-            raise ValueError('Too short Modbus RTU response (minimum length {} bytes). Response: {!r}'.format( \
-                MINIMAL_RESPONSE_LENGTH_RTU,
-                response))
+        raise ValueError('Too short Modbus RTU response (minimum length {} bytes). Response: {!r}'.format( \
+            MINIMAL_RESPONSE_LENGTH_RTU,
+            response))
 
     # Validate the ASCII header and footer.
     if mode == MODE_ASCII:
         if response[BYTEPOSITION_FOR_ASCII_HEADER] != _ASCII_HEADER:
-            raise ValueError('Did not find header ({!r}) as start of ASCII response. The plain response is: {!r}'.format( \
-                _ASCII_HEADER,
-                response))
+            raise ValueError(
+                'Did not find header ({!r}) as start of ASCII response. The plain response is: {!r}'.format( \
+                    _ASCII_HEADER,
+                    response))
         elif response[-len(_ASCII_FOOTER):] != _ASCII_FOOTER:
             raise ValueError('Did not find footer ({!r}) as end of ASCII response. The plain response is: {!r}'.format( \
                 _ASCII_FOOTER,
@@ -1056,7 +1052,7 @@ def _extractPayload(response, slaveaddress, mode, functioncode):
 
         if len(response) % 2 != 0:
             template = 'Stripped ASCII frames should have an even number of bytes, but is {} bytes. ' + \
-                    'The stripped response is: {!r} (plain response: {!r})'
+                       'The stripped response is: {!r} (plain response: {!r})'
             raise ValueError(template.format(len(response), response, plainresponse))
 
         # Convert the ASCII (stripped) response string to RTU-like response string
@@ -1071,16 +1067,16 @@ def _extractPayload(response, slaveaddress, mode, functioncode):
         numberOfChecksumBytes = NUMBER_OF_CRC_BYTES
 
     receivedChecksum = response[-numberOfChecksumBytes:]
-    responseWithoutChecksum = response[0 : len(response) - numberOfChecksumBytes]
+    responseWithoutChecksum = response[0: len(response) - numberOfChecksumBytes]
     calculatedChecksum = calculateChecksum(responseWithoutChecksum)
 
     if receivedChecksum != calculatedChecksum:
         template = 'Checksum error in {} mode: {!r} instead of {!r} . The response is: {!r} (plain response: {!r})'
         text = template.format(
-                mode,
-                receivedChecksum,
-                calculatedChecksum,
-                response, plainresponse)
+            mode,
+            receivedChecksum,
+            calculatedChecksum,
+            response, plainresponse)
         raise ValueError(text)
 
     # Check slave address
@@ -1111,9 +1107,10 @@ def _extractPayload(response, slaveaddress, mode, functioncode):
     payload = response[firstDatabyteNumber:lastDatabyteNumber]
     return payload
 
-############################################
-## Serial communication utility functions ##
-############################################
+
+##########################################
+# Serial communication utility functions #
+##########################################
 
 
 def _predictResponseSize(mode, functioncode, payloadToSlave):
@@ -1139,10 +1136,10 @@ def _predictResponseSize(mode, functioncode, payloadToSlave):
 
     RTU_TO_ASCII_PAYLOAD_FACTOR = 2
 
-    NUMBER_OF_RTU_RESPONSE_STARTBYTES   = 2
-    NUMBER_OF_RTU_RESPONSE_ENDBYTES     = 2
+    NUMBER_OF_RTU_RESPONSE_STARTBYTES = 2
+    NUMBER_OF_RTU_RESPONSE_ENDBYTES = 2
     NUMBER_OF_ASCII_RESPONSE_STARTBYTES = 5
-    NUMBER_OF_ASCII_RESPONSE_ENDBYTES   = 4
+    NUMBER_OF_ASCII_RESPONSE_ENDBYTES = 4
 
     # Argument validity testing
     _checkMode(mode)
@@ -1173,12 +1170,12 @@ def _predictResponseSize(mode, functioncode, payloadToSlave):
     # Calculate number of bytes to read
     if mode == MODE_ASCII:
         return NUMBER_OF_ASCII_RESPONSE_STARTBYTES + \
-            response_payload_size * RTU_TO_ASCII_PAYLOAD_FACTOR + \
-            NUMBER_OF_ASCII_RESPONSE_ENDBYTES
+               response_payload_size * RTU_TO_ASCII_PAYLOAD_FACTOR + \
+               NUMBER_OF_ASCII_RESPONSE_ENDBYTES
     else:
         return NUMBER_OF_RTU_RESPONSE_STARTBYTES + \
-            response_payload_size + \
-            NUMBER_OF_RTU_RESPONSE_ENDBYTES
+               response_payload_size + \
+               NUMBER_OF_RTU_RESPONSE_ENDBYTES
 
 
 def _calculate_minimum_silent_period(baudrate):
@@ -1201,6 +1198,7 @@ def _calculate_minimum_silent_period(baudrate):
 
     bittime = 1 / float(baudrate)
     return bittime * BITTIMES_PER_CHARACTERTIME * MINIMUM_SILENT_CHARACTERTIMES
+
 
 ##############################
 # String and num conversions #
@@ -1472,8 +1470,8 @@ def _bytestringToFloat(bytestring, numberOfRegisters=2):
         raise ValueError('Wrong number of registers! Given value is {0!r}'.format(numberOfRegisters))
 
     if len(bytestring) != numberOfBytes:
-        raise ValueError('Wrong length of the byte string! Given value is {0!r}, and numberOfRegisters is {1!r}.'.\
-            format(bytestring, numberOfRegisters))
+        raise ValueError('Wrong length of the byte string! Given value is {0!r}, and numberOfRegisters is {1!r}.'. \
+                         format(bytestring, numberOfRegisters))
 
     return _unpack(formatcode, bytestring)
 
@@ -1562,7 +1560,7 @@ def _valuelistToBytestring(valuelist, numberOfRegisters):
         _checkInt(value, minvalue=MINVALUE, maxvalue=MAXVALUE, description='elements in the input value list')
 
     _checkInt(len(valuelist), minvalue=numberOfRegisters, maxvalue=numberOfRegisters, \
-        description='length of the list')
+              description='length of the list')
 
     numberOfBytes = _NUMBER_OF_BYTES_PER_REGISTER * numberOfRegisters
 
@@ -1597,7 +1595,7 @@ def _bytestringToValuelist(bytestring, numberOfRegisters):
     values = []
     for i in range(numberOfRegisters):
         offset = _NUMBER_OF_BYTES_PER_REGISTER * i
-        substring = bytestring[offset : offset + _NUMBER_OF_BYTES_PER_REGISTER]
+        substring = bytestring[offset: offset + _NUMBER_OF_BYTES_PER_REGISTER]
         values.append(_twoByteStringToNum(substring))
 
     return values
@@ -1671,7 +1669,7 @@ def _unpack(formatstring, packed):
     return value
 
 
-def _hexencode(bytestring, insert_spaces = False):
+def _hexencode(bytestring, insert_spaces=False):
     """Convert a byte string to a hex encoded string.
 
     For example 'J' will return '4A', and ``'\\x04'`` will return '04'.
@@ -1691,13 +1689,13 @@ def _hexencode(bytestring, insert_spaces = False):
     _checkString(bytestring, description='byte string')
 
     separator = '' if not insert_spaces else ' '
-    
+
     # Use plain string formatting instead of binhex.hexlify,
     # in order to have it Python 2.x and 3.x compatible
 
     byte_representions = []
     for c in bytestring:
-        byte_representions.append( '{0:02X}'.format(ord(c)) )
+        byte_representions.append('{0:02X}'.format(ord(c)))
     return separator.join(byte_representions).strip()
 
 
@@ -1750,7 +1748,7 @@ def _hexlify(bytestring):
     See _hexencode() for details.
 
     """
-    return _hexencode(bytestring, insert_spaces = True)
+    return _hexencode(bytestring, insert_spaces=True)
 
 
 def _bitResponseToValue(bytestring):
@@ -1768,7 +1766,7 @@ def _bitResponseToValue(bytestring):
     """
     _checkString(bytestring, description='bytestring', minlength=1, maxlength=1)
 
-    RESPONSE_ON  = '\x01'
+    RESPONSE_ON = '\x01'
     RESPONSE_OFF = '\x00'
 
     if bytestring == RESPONSE_ON:
@@ -1810,6 +1808,7 @@ def _createBitpattern(functioncode, value):
         else:
             return '\x01'  # Is this correct??
 
+
 #######################
 # Number manipulation #
 #######################
@@ -1847,7 +1846,8 @@ def _twosComplement(x, bits=16):
     upperlimit = 2 ** (bits - 1) - 1
     lowerlimit = -2 ** (bits - 1)
     if x > upperlimit or x < lowerlimit:
-        raise ValueError('The input value is out of range. Given value is {0}, but allowed range is {1} to {2} when using {3} bits.' \
+        raise ValueError(
+            'The input value is out of range. Given value is {0}, but allowed range is {1} to {2} when using {3} bits.' \
             .format(x, lowerlimit, upperlimit, bits))
 
     # Calculate two'2 complement
@@ -1886,7 +1886,8 @@ def _fromTwosComplement(x, bits=16):
     upperlimit = 2 ** (bits) - 1
     lowerlimit = 0
     if x > upperlimit or x < lowerlimit:
-        raise ValueError('The input value is out of range. Given value is {0}, but allowed range is {1} to {2} when using {3} bits.' \
+        raise ValueError(
+            'The input value is out of range. Given value is {0}, but allowed range is {1} to {2} when using {3} bits.' \
             .format(x, lowerlimit, upperlimit, bits))
 
     # Calculate inverse(?) of two'2 complement
@@ -1894,6 +1895,7 @@ def _fromTwosComplement(x, bits=16):
     if x <= limit:
         return x
     return x - 2 ** bits
+
 
 ####################
 # Bit manipulation #
@@ -1918,34 +1920,35 @@ def _setBitOn(x, bitNum):
 
     return x | (1 << bitNum)
 
+
 ############################
 # Error checking functions #
 ############################
 
 _CRC16TABLE = (
-        0, 49345, 49537,   320, 49921,   960,   640, 49729, 50689,  1728,  1920, 
-    51009,  1280, 50625, 50305,  1088, 52225,  3264,  3456, 52545,  3840, 53185, 
-    52865,  3648,  2560, 51905, 52097,  2880, 51457,  2496,  2176, 51265, 55297, 
-     6336,  6528, 55617,  6912, 56257, 55937,  6720,  7680, 57025, 57217,  8000, 
-    56577,  7616,  7296, 56385,  5120, 54465, 54657,  5440, 55041,  6080,  5760, 
-    54849, 53761,  4800,  4992, 54081,  4352, 53697, 53377,  4160, 61441, 12480, 
-    12672, 61761, 13056, 62401, 62081, 12864, 13824, 63169, 63361, 14144, 62721, 
-    13760, 13440, 62529, 15360, 64705, 64897, 15680, 65281, 16320, 16000, 65089, 
-    64001, 15040, 15232, 64321, 14592, 63937, 63617, 14400, 10240, 59585, 59777, 
-    10560, 60161, 11200, 10880, 59969, 60929, 11968, 12160, 61249, 11520, 60865, 
-    60545, 11328, 58369,  9408,  9600, 58689,  9984, 59329, 59009,  9792,  8704, 
-    58049, 58241,  9024, 57601,  8640,  8320, 57409, 40961, 24768, 24960, 41281, 
-    25344, 41921, 41601, 25152, 26112, 42689, 42881, 26432, 42241, 26048, 25728, 
-    42049, 27648, 44225, 44417, 27968, 44801, 28608, 28288, 44609, 43521, 27328, 
-    27520, 43841, 26880, 43457, 43137, 26688, 30720, 47297, 47489, 31040, 47873, 
-    31680, 31360, 47681, 48641, 32448, 32640, 48961, 32000, 48577, 48257, 31808, 
-    46081, 29888, 30080, 46401, 30464, 47041, 46721, 30272, 29184, 45761, 45953, 
-    29504, 45313, 29120, 28800, 45121, 20480, 37057, 37249, 20800, 37633, 21440, 
-    21120, 37441, 38401, 22208, 22400, 38721, 21760, 38337, 38017, 21568, 39937, 
-    23744, 23936, 40257, 24320, 40897, 40577, 24128, 23040, 39617, 39809, 23360, 
-    39169, 22976, 22656, 38977, 34817, 18624, 18816, 35137, 19200, 35777, 35457, 
-    19008, 19968, 36545, 36737, 20288, 36097, 19904, 19584, 35905, 17408, 33985, 
-    34177, 17728, 34561, 18368, 18048, 34369, 33281, 17088, 17280, 33601, 16640, 
+    0, 49345, 49537, 320, 49921, 960, 640, 49729, 50689, 1728, 1920,
+    51009, 1280, 50625, 50305, 1088, 52225, 3264, 3456, 52545, 3840, 53185,
+    52865, 3648, 2560, 51905, 52097, 2880, 51457, 2496, 2176, 51265, 55297,
+    6336, 6528, 55617, 6912, 56257, 55937, 6720, 7680, 57025, 57217, 8000,
+    56577, 7616, 7296, 56385, 5120, 54465, 54657, 5440, 55041, 6080, 5760,
+    54849, 53761, 4800, 4992, 54081, 4352, 53697, 53377, 4160, 61441, 12480,
+    12672, 61761, 13056, 62401, 62081, 12864, 13824, 63169, 63361, 14144, 62721,
+    13760, 13440, 62529, 15360, 64705, 64897, 15680, 65281, 16320, 16000, 65089,
+    64001, 15040, 15232, 64321, 14592, 63937, 63617, 14400, 10240, 59585, 59777,
+    10560, 60161, 11200, 10880, 59969, 60929, 11968, 12160, 61249, 11520, 60865,
+    60545, 11328, 58369, 9408, 9600, 58689, 9984, 59329, 59009, 9792, 8704,
+    58049, 58241, 9024, 57601, 8640, 8320, 57409, 40961, 24768, 24960, 41281,
+    25344, 41921, 41601, 25152, 26112, 42689, 42881, 26432, 42241, 26048, 25728,
+    42049, 27648, 44225, 44417, 27968, 44801, 28608, 28288, 44609, 43521, 27328,
+    27520, 43841, 26880, 43457, 43137, 26688, 30720, 47297, 47489, 31040, 47873,
+    31680, 31360, 47681, 48641, 32448, 32640, 48961, 32000, 48577, 48257, 31808,
+    46081, 29888, 30080, 46401, 30464, 47041, 46721, 30272, 29184, 45761, 45953,
+    29504, 45313, 29120, 28800, 45121, 20480, 37057, 37249, 20800, 37633, 21440,
+    21120, 37441, 38401, 22208, 22400, 38721, 21760, 38337, 38017, 21568, 39937,
+    23744, 23936, 40257, 24320, 40897, 40577, 24128, 23040, 39617, 39809, 23360,
+    39169, 22976, 22656, 38977, 34817, 18624, 18816, 35137, 19200, 35777, 35457,
+    19008, 19968, 36545, 36737, 20288, 36097, 19904, 19584, 35905, 17408, 33985,
+    34177, 17728, 34561, 18368, 18048, 34369, 33281, 17088, 17280, 33601, 16640,
     33217, 32897, 16448)
 """CRC-16 lookup table with 256 elements.
     Built with this code:    
@@ -1982,13 +1985,13 @@ def _calculateCrcString(inputstring):
 
     """
     _checkString(inputstring, description='input CRC string')
- 
+
     # Preload a 16-bit register with ones
     register = 0xFFFF
 
     for char in inputstring:
         register = (register >> 8) ^ _CRC16TABLE[(register ^ ord(char)) & 0xFF]
- 
+
     return _numToTwoByteString(register, LsbFirst=True)
 
 
@@ -2128,7 +2131,7 @@ def _checkResponseByteCount(payload):
 
     if givenNumberOfDatabytes != countedNumberOfDatabytes:
         errortemplate = 'Wrong given number of bytes in the response: {0}, but counted is {1} as data payload length is {2}.' + \
-            ' The data payload is: {3!r}'
+                        ' The data payload is: {3!r}'
         errortext = errortemplate.format(givenNumberOfDatabytes, countedNumberOfDatabytes, len(payload), payload)
         raise ValueError(errortext)
 
@@ -2181,8 +2184,9 @@ def _checkResponseNumberOfRegisters(payload, numberOfRegisters):
     receivedNumberOfWrittenReisters = _twoByteStringToNum(bytesForNumberOfRegisters)
 
     if receivedNumberOfWrittenReisters != numberOfRegisters:
-        raise ValueError('Wrong number of registers to write in the response: {0}, but commanded is {1}. The data payload is: {2!r}'.format( \
-            receivedNumberOfWrittenReisters, numberOfRegisters, payload))
+        raise ValueError(
+            'Wrong number of registers to write in the response: {0}, but commanded is {1}. The data payload is: {2!r}'.format( \
+                receivedNumberOfWrittenReisters, numberOfRegisters, payload))
 
 
 def _checkResponseWriteData(payload, writedata):
@@ -2206,8 +2210,9 @@ def _checkResponseWriteData(payload, writedata):
     receivedWritedata = payload[BYTERANGE_FOR_WRITEDATA]
 
     if receivedWritedata != writedata:
-        raise ValueError('Wrong write data in the response: {0!r}, but commanded is {1!r}. The data payload is: {2!r}'.format( \
-            receivedWritedata, writedata, payload))
+        raise ValueError(
+            'Wrong write data in the response: {0!r}, but commanded is {1!r}. The data payload is: {2!r}'.format( \
+                receivedWritedata, writedata, payload))
 
 
 def _checkString(inputstring, description, minlength=0, maxlength=None):
@@ -2346,6 +2351,7 @@ def _checkBool(inputvalue, description='inputvalue'):
     if not isinstance(inputvalue, bool):
         raise TypeError('The {0} must be boolean. Given: {1!r}'.format(description, inputvalue))
 
+
 #####################
 # Development tools #
 #####################
@@ -2426,69 +2432,76 @@ def _interpretRawMessage(inputstr):
         extractedpayload = _extractPayload(inputstr, slaveaddress, mode, functioncode)
         output += 'Valid message. Extracted payload: {!r}\n'.format(extractedpayload)
     except (ValueError, TypeError) as err:
-        output += '\nThe message does not seem to be valid Modbus {}. Error message: \n{}. \n\n'.format(mode.upper(), err.message)
+        output += '\nThe message does not seem to be valid Modbus {}. Error message: \n{}. \n\n'.format(mode.upper(),
+                                                                                                        err.message)
     except NameError as err:
-        output += '\nNo message validity checking. \n\n' # Slave address or function code not available
+        output += '\nNo message validity checking. \n\n'  # Slave address or function code not available
 
     # Generate table describing the message
     if mode == MODE_RTU:
         output += '\nPos   Character Hex  Dec  Probable interpretation \n'
         output += '------------------------------------------------- \n'
         for i, character in enumerate(inputstr):
-            if i==0:
+            if i == 0:
                 description = 'Slave address'
-            elif i==1:
+            elif i == 1:
                 description = 'Function code'
-            elif i==len(inputstr)-2:
+            elif i == len(inputstr) - 2:
                 description = 'Checksum, CRC LSB'
-            elif i==len(inputstr)-1:
+            elif i == len(inputstr) - 1:
                 description = 'Checksum, CRC MSB'
             else:
                 description = 'Payload'
-            output += '{0:3.0f}:  {1!r:<8}  {2:02X}  {2: 4.0f}  {3:<10} \n'.format(i, character, ord(character), description)
-        
+            output += '{0:3.0f}:  {1!r:<8}  {2:02X}  {2: 4.0f}  {3:<10} \n'.format(i, character, ord(character),
+                                                                                   description)
+
     elif mode == MODE_ASCII:
         output += '\nPos   Character(s) Converted  Hex  Dec  Probable interpretation \n'
         output += '--------------------------------------------------------------- \n'
-        
+
         i = 0
         while i < len(inputstr):
-            
+
             if inputstr[i] in [':', '\r', '\n']:
-                if inputstr[i] == ':': 
+                if inputstr[i] == ':':
                     description = 'Start character'
                 else:
                     description = 'Stop character'
-                    
+
                 output += '{0:3.0f}:  {1!r:<8}                          {2} \n'.format(i, inputstr[i], description)
                 i += 1
-                
+
             else:
                 if i == 1:
                     description = 'Slave address'
                 elif i == 3:
                     description = 'Function code'
-                elif i == len(inputstr)-4:
+                elif i == len(inputstr) - 4:
                     description = 'Checksum (LRC)'
                 else:
                     description = 'Payload'
-                
+
                 try:
-                    hexvalue = _hexdecode(inputstr[i:i+2])
-                    output +=  '{0:3.0f}:  {1!r:<8}     {2!r}     {3:02X}  {3: 4.0f}  {4} \n'.format(i, inputstr[i:i+2], hexvalue, ord(hexvalue), description)
+                    hexvalue = _hexdecode(inputstr[i:i + 2])
+                    output += '{0:3.0f}:  {1!r:<8}     {2!r}     {3:02X}  {3: 4.0f}  {4} \n'.format(i,
+                                                                                                    inputstr[i:i + 2],
+                                                                                                    hexvalue,
+                                                                                                    ord(hexvalue),
+                                                                                                    description)
                 except:
-                    output +=  '{0:3.0f}:  {1!r:<8}     ?           ?     ?  {2} \n'.format(i, inputstr[i:i+2], description)
+                    output += '{0:3.0f}:  {1!r:<8}     ?           ?     ?  {2} \n'.format(i, inputstr[i:i + 2],
+                                                                                           description)
                 i += 2
-        
+
     # Generate description for the payload
     output += '\n\n'
     try:
         output += _interpretPayload(functioncode, extractedpayload)
     except:
-        output += '\nCould not interpret the payload. \n\n' # Payload or function code not available
-    
+        output += '\nCould not interpret the payload. \n\n'  # Payload or function code not available
+
     return output
-    
+
 
 def _interpretPayload(functioncode, payload):
     r"""Generate a human readable description of a Modbus payload.
@@ -2511,13 +2524,13 @@ def _interpretPayload(functioncode, payload):
     output += 'Modbus payload decoder\n'
     output += 'Input payload (length {} characters): {!r} \n'.format(len(payload), payload)
     output += 'Function code: {} (dec).\n'.format(functioncode)
-    
+
     if len(payload) == 4:
         FourbyteMessageFirstHalfValue = _twoByteStringToNum(payload[0:2])
         FourbyteMessageSecondHalfValue = _twoByteStringToNum(payload[2:4])
 
-
     return output
+
 
 def _getDiagnosticString():
     """Generate a diagnostic string, showing the module version, the platform, current directory etc.
@@ -2557,4 +2570,3 @@ def _getDiagnosticString():
     text += '\n'.join(sys.path) + '\n'
     text += '\n## End of diagnostic output ## \n'
     return text
-
