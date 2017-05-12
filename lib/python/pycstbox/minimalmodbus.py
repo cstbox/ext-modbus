@@ -108,7 +108,7 @@ def register_serial_port(port,
         time.sleep(0.5)
 
     else:
-        if any([getattr(sp, k) != v] for k, v in settings.items()):
+        if any([getattr(sp, k) != v for k, v in settings.items()]):
             msg = 'port %s already registered with different settings' % port
             raise ValueError(msg)
 
