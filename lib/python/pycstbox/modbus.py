@@ -103,7 +103,6 @@ class RTUModbusHWDevice(Instrument, Loggable):
         self.terminate = False
         self.communication_error = False
 
-        self.total_requests = 0
         self.total_reads = 0
         self.total_errors = 0
 
@@ -124,14 +123,6 @@ class RTUModbusHWDevice(Instrument, Loggable):
         :return: the registers content as a string, or None if a communication error occurred
         :rtype: str
         """
-        if self.total_requests and self.total_requests % self.STATS_INTERVAL == 0:
-            self.log_info(
-                    'traffic stats: reqs=%d reads=%d errs=%d',
-                    self.total_requests, self.total_reads, self.total_errors
-            )
-
-        self.total_requests += 1
-
         if self.serial.isOpen():
             # ensure no junk is lurking there
             self.serial.flushInput()
