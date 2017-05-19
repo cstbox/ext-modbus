@@ -25,7 +25,7 @@ import logging
 
 from pycstbox.log import Loggable
 from pycstbox.hal import HalError
-from pycstbox.hal.device import PolledDevice
+from pycstbox.hal.device import PolledDevice, CommunicationError, CRCError
 from pycstbox.minimalmodbus import register_serial_port, Instrument, BAUDRATE, PARITY, BYTESIZE, STOPBITS, TIMEOUT
 
 _logger = logging.getLogger('modbus')
@@ -45,6 +45,13 @@ class RTUModbusHALDevice(PolledDevice):
         register_serial_port(coord_cfg.port, logger=_logger, **port_cfg)
 
         super(RTUModbusHALDevice, self).__init__(coord_cfg, dev_cfg)
+
+    def poll(self):
+        try:
+            return super(RTUModbusHALDevice, self).poll()
+        except ValueError as e:
+            # minimalmodbus based HW devices report CRC errors as ValueError
+            raise CRCError(self.device_id, e)
 
 
 class ModbusRegister(namedtuple('ModbusRegister', ['addr', 'size', 'cfgreg', 'signed'])):
@@ -128,39 +135,30 @@ class RTUModbusHWDevice(Instrument, Loggable):
             self.serial.flushInput()
             self.serial.flushOutput()
 
-        attempts_left = self.retries
-        while True:
-            try:
-                self.total_reads += 1
-                data = self.read_string(start_addr, reg_count)
+        try:
+            data = self.read_string(start_addr, reg_count)
+        except IOError as e:
+            raise CommunicationError(self.unit_id, e)
+        except ValueError as e:
+            raise CRCError(self.unit_id, e)
+        else:
+            return data
 
-            except ValueError:
-                self.total_errors += 1
+    def reset(self):
+        self.log_warning('resetting communications and device')
+        self.reset_communications()
+        self.reset_device()
 
-                # CRC error is reported as ValueError
-                attempts_left -= 1
+    def reset_communications(self):
+        self.serial.close()
+        time.sleep(self.poll_req_interval)
+        self.serial.open()
+        time.sleep(0.1)
+        self.serial.flushInput()
+        self.serial.flushOutput()
 
-                # reset the serial link, wait a bit and retry until max attempts
-                if attempts_left:
-                    self.log_warning('trying to recover from CRC error (attempts remaining=%d)', attempts_left)
-                    self.serial.close()
-                    time.sleep(self.poll_req_interval)
-                    self.serial.open()
-                    time.sleep(0.1)
-                    self.serial.flushInput()
-                    self.serial.flushOutput()
-
-                else:
-                    self.log_error('cannot recover from error, request ignored')
-                    self.communication_error = True
-
-                    return None
-
-            else:
-                if self.communication_error:
-                    self.log_info('recovered from error')
-                    self.communication_error = False
-                return data
+    def reset_device(self):
+        pass
 
     def unpack_registers(self, start_register, reg_count=1, unpack_format='>h'):
         """ Reads and unpacks registers. 
